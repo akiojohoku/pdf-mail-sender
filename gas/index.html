@@ -1,0 +1,709 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PDF個別メール送信システム</title>
+<script src="https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    font-family: "Hiragino Sans", "Yu Gothic UI", "Meiryo", sans-serif;
+    margin: 0; background: #f0f4f8; color: #1a2733;
+  }
+  header {
+    background: #1e5b8a; color: #fff; padding: 14px 24px;
+    display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;
+  }
+  header h1 { font-size: 20px; margin: 0; }
+  header button {
+    background: #fff; color: #1e5b8a; border: none; border-radius: 6px;
+    padding: 8px 16px; font-size: 14px; cursor: pointer; font-weight: bold;
+  }
+  main { max-width: 980px; margin: 0 auto; padding: 20px 16px 60px; }
+  .card {
+    background: #fff; border-radius: 10px; padding: 20px 24px;
+    margin-bottom: 18px; box-shadow: 0 1px 4px rgba(0,0,0,.08);
+  }
+  .card h2 {
+    font-size: 16px; margin: 0 0 14px; padding-bottom: 8px;
+    border-bottom: 2px solid #1e5b8a;
+  }
+  .card h2 .step {
+    background: #1e5b8a; color: #fff; border-radius: 12px;
+    padding: 2px 12px; font-size: 13px; margin-right: 8px;
+  }
+  label { display: block; font-size: 13px; font-weight: bold; margin: 12px 0 4px; }
+  input[type=text], input[type=number], textarea, select {
+    width: 100%; padding: 9px 10px; font-size: 15px;
+    border: 1px solid #b6c4d0; border-radius: 6px; background: #fff;
+  }
+  textarea { min-height: 140px; resize: vertical; line-height: 1.6; }
+  input[type=file] { font-size: 14px; }
+  .row { display: flex; gap: 16px; flex-wrap: wrap; }
+  .row > div { flex: 1; min-width: 220px; }
+  .row > div.narrow { flex: 0 0 170px; min-width: 150px; }
+  button.primary, button.secondary, button.danger {
+    border: none; border-radius: 6px; padding: 11px 22px; font-size: 15px;
+    cursor: pointer; font-weight: bold;
+  }
+  button.primary { background: #1e5b8a; color: #fff; }
+  button.secondary { background: #e3ecf3; color: #1e5b8a; }
+  button.danger { background: #c0392b; color: #fff; }
+  button:disabled { opacity: .45; cursor: not-allowed; }
+  .toggle { display: inline-flex; border: 2px solid #1e5b8a; border-radius: 8px; overflow: hidden; }
+  .toggle button {
+    border: none; background: #fff; color: #1e5b8a; padding: 10px 26px;
+    font-size: 15px; cursor: pointer; font-weight: bold;
+  }
+  .toggle button.active { background: #1e5b8a; color: #fff; }
+  .msg-error, .msg-warn, .msg-ok {
+    border-radius: 6px; padding: 10px 14px; margin: 10px 0; font-size: 14px;
+    white-space: pre-wrap; line-height: 1.6;
+  }
+  .msg-error { background: #fdecea; color: #b71c1c; border: 1px solid #f5c6c0; }
+  .msg-warn  { background: #fff8e1; color: #7a5b00; border: 1px solid #f0e0a0; }
+  .msg-ok    { background: #e8f5e9; color: #1b5e20; border: 1px solid #bfe3c2; }
+  table { border-collapse: collapse; width: 100%; font-size: 13px; margin-top: 10px; }
+  th, td { border: 1px solid #d4dee6; padding: 6px 8px; text-align: left; }
+  th { background: #eef4f8; }
+  tr.skip td { background: #fafafa; color: #999; }
+  tr.fail td { background: #fdecea; }
+  .greeting-preview {
+    background: #f5f8fa; border: 1px dashed #9db4c4; border-radius: 6px;
+    padding: 12px 14px; font-size: 14px; margin-top: 12px; white-space: pre-wrap;
+    line-height: 1.6;
+  }
+  .progress-outer {
+    background: #e3ecf3; border-radius: 8px; height: 26px; overflow: hidden; margin: 12px 0;
+  }
+  .progress-inner {
+    background: #2e8b57; height: 100%; width: 0; transition: width .4s;
+    color: #fff; font-size: 13px; font-weight: bold;
+    display: flex; align-items: center; justify-content: center; min-width: 0;
+  }
+  .hint { font-size: 12px; color: #607585; margin-top: 4px; line-height: 1.6; }
+  .hidden { display: none; }
+  .btnrow { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 14px; align-items: center; }
+  .scrollbox { max-height: 340px; overflow-y: auto; border: 1px solid #d4dee6; border-radius: 6px; }
+  .scrollbox table { margin-top: 0; }
+  .scrollbox th { position: sticky; top: 0; }
+  .me-badge {
+    background: #e8f5e9; border: 1px solid #bfe3c2; color: #1b5e20;
+    border-radius: 6px; padding: 9px 12px; font-size: 15px; font-weight: bold;
+  }
+  #demoBanner {
+    background: #7a5b00; color: #fff; text-align: center; padding: 6px; font-size: 13px;
+  }
+</style>
+</head>
+<body>
+<div id="demoBanner" class="hidden">⚠ デモモードで表示中(Google Apps Script上ではないため、実際の送信は行われません)</div>
+<header>
+  <h1>📧 PDF個別メール送信システム</h1>
+  <button onclick="toggleHistory()">📋 送信履歴</button>
+</header>
+<main>
+
+  <!-- 履歴 -->
+  <div class="card hidden" id="historyCard">
+    <h2>送信履歴(あなたの分)</h2>
+    <div id="historyLink" class="hint"></div>
+    <div class="scrollbox"><table id="historyTable">
+      <thead><tr><th>日時</th><th>種別</th><th>件名</th><th>通し番号</th><th>生徒氏名</th><th>メールアドレス</th><th>結果</th><th>エラー</th></tr></thead>
+      <tbody></tbody>
+    </table></div>
+  </div>
+
+  <!-- STEP 1 送信元 -->
+  <div class="card">
+    <h2><span class="step">STEP 1</span>送信元(あなた)の確認</h2>
+    <div class="row">
+      <div>
+        <label>送信元(いまGoogleにログインしているアカウントから送信されます)</label>
+        <div class="me-badge" id="myEmail">確認中…</div>
+        <div class="hint" id="quotaHint"></div>
+      </div>
+      <div>
+        <label>保存済みテンプレート</label>
+        <div style="display:flex; gap:8px;">
+          <select id="templateSelect"></select>
+          <button class="secondary" onclick="applyTemplate()">読込</button>
+          <button class="secondary" onclick="deleteTemplateUI()">削除</button>
+        </div>
+        <div class="hint">テンプレートはあなたのGoogleアカウントに保存されます。</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- STEP 2 ファイル -->
+  <div class="card">
+    <h2><span class="step">STEP 2</span>名簿CSVとPDFの読み込み</h2>
+    <div class="row">
+      <div>
+        <label>名簿CSVファイル(通し番号・クラス・出席番号・生徒氏名・メールアドレス)</label>
+        <input type="file" id="csvFile" accept=".csv,text/csv">
+        <div class="hint">
+          <a href="#" onclick="downloadCsvTemplate(); return false;">📄 CSVテンプレートをダウンロード</a>
+          — 初めての方はこれをダウンロードし、Excelなどで名簿を入力してから
+          この欄にアップロードしてください。
+        </div>
+      </div>
+      <div>
+        <label>PDFファイル(全員分がまとまった1つのファイル)</label>
+        <input type="file" id="pdfFile" accept=".pdf,application/pdf">
+      </div>
+      <div class="narrow">
+        <label>1人あたりのページ数</label>
+        <input type="number" id="pagesPer" value="1" min="1">
+      </div>
+    </div>
+    <div class="btnrow">
+      <button class="primary" onclick="loadFiles()" id="uploadBtn">📂 読み込んでチェック</button>
+    </div>
+    <div id="uploadMsg"></div>
+    <div id="previewArea" class="hidden">
+      <div class="scrollbox"><table id="previewTable">
+        <thead><tr>
+          <th>通し番号</th><th>クラス</th><th>番号</th><th>生徒氏名</th>
+          <th>メールアドレス</th><th>PDFページ</th><th>添付ファイル名</th><th>状態</th>
+        </tr></thead>
+        <tbody></tbody>
+      </table></div>
+    </div>
+  </div>
+
+  <!-- STEP 3 メール内容 -->
+  <div class="card">
+    <h2><span class="step">STEP 3</span>メールの内容</h2>
+    <label>宛名(本文の先頭に自動で入ります・全員共通)</label>
+    <div class="toggle">
+      <button id="hon-kun" onclick="setHonorific('君')">(生徒氏名)君</button>
+      <button id="hon-hogo" class="active" onclick="setHonorific('保護者様')">(生徒氏名)保護者様</button>
+    </div>
+    <div class="row">
+      <div>
+        <label>件名</label>
+        <input type="text" id="subject" placeholder="例: 三者面談のご案内">
+      </div>
+      <div>
+        <label>添付ファイル名の頭</label>
+        <input type="text" id="prefix" placeholder="例: 面談案内">
+        <div class="hint">添付ファイル名は「(頭)_(生徒氏名).pdf」になります。例: 面談案内_山田太郎.pdf</div>
+      </div>
+    </div>
+    <label>本文(全員共通)</label>
+    <textarea id="body" placeholder="いつもお世話になっております。&#10;添付のPDFをご確認ください。"></textarea>
+    <div class="greeting-preview" id="greetingPreview"></div>
+    <div class="btnrow">
+      <button class="secondary" onclick="saveTemplateUI()">💾 この内容をテンプレートとして保存</button>
+    </div>
+  </div>
+
+  <!-- STEP 4 送信 -->
+  <div class="card">
+    <h2><span class="step">STEP 4</span>テスト送信と本送信</h2>
+    <div class="hint">
+      アプリパスワードなどの入力は不要です。上のSTEP 1に表示されている
+      あなたのアカウントから送信されます(送信済みメールはGmailの「送信済み」に残ります)。
+    </div>
+    <div class="btnrow">
+      <button class="secondary" onclick="testSendUI()" id="testBtn">✉️ 自分宛てにテスト送信(1通)</button>
+      <button class="primary" onclick="realSend()" id="sendBtn">🚀 本送信を開始</button>
+      <button class="danger hidden" onclick="cancelSend()" id="cancelBtn">⛔ 中断</button>
+    </div>
+    <div id="sendMsg"></div>
+    <div id="progressArea" class="hidden">
+      <div class="progress-outer"><div class="progress-inner" id="progressBar"></div></div>
+      <div id="progressText" style="font-size:14px; font-weight:bold;"></div>
+      <div class="scrollbox"><table id="resultTable">
+        <thead><tr><th>通し番号</th><th>生徒氏名</th><th>メールアドレス</th><th>結果</th><th>エラー内容</th></tr></thead>
+        <tbody></tbody>
+      </table></div>
+      <div class="btnrow">
+        <button class="danger hidden" id="resendBtn" onclick="resendFailed()">🔁 失敗した人だけ再送信</button>
+      </div>
+    </div>
+  </div>
+
+</main>
+<script>
+const REQUIRED_HEADERS = ["通し番号", "クラス", "出席番号", "生徒氏名", "メールアドレス"];
+const BATCH_MAX_ITEMS = 10;          // 1回のサーバー呼び出しで送る最大人数
+const BATCH_MAX_B64 = 10 * 1024 * 1024; // 1回の呼び出しのPDF合計サイズ上限(Base64文字数)
+
+let students = [];
+let srcPdfDoc = null;   // pdf-lib のドキュメント(読み込み済みPDF)
+let filesValid = false;
+let honorific = "保護者様";
+let cancelFlag = false;
+let sending = false;
+let lastResults = [];
+let templates = [];
+
+const $ = id => document.getElementById(id);
+const IS_DEMO = (typeof google === "undefined" || !google.script);
+
+function esc(s) {
+  return String(s ?? "").replace(/[&<>"']/g,
+    c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+}
+function showMsg(el, type, text) {
+  $(el).innerHTML = text ? `<div class="msg-${type}">${esc(text)}</div>` : "";
+}
+function attachName(name) {
+  const prefix = $("prefix").value.trim() || "(頭)";
+  return `${prefix}_${String(name || "").replace(/\s+/g, "")}.pdf`
+    .replace(/[\\/:*?"<>|]/g, "");
+}
+
+/* ---------- サーバー呼び出し(GAS / デモ両対応) ---------- */
+function serverCall(fn, ...args) {
+  if (IS_DEMO) return demoServer(fn, args);
+  return new Promise((resolve, reject) => {
+    google.script.run
+      .withSuccessHandler(resolve)
+      .withFailureHandler(e => reject(new Error(e && e.message ? e.message : String(e))))
+      [fn](...args);
+  });
+}
+const demoState = { templates: [] };
+async function demoServer(fn, args) {
+  await new Promise(r => setTimeout(r, 250));
+  switch (fn) {
+    case "getInitialData":
+      return { email: "demo@example.com", templates: demoState.templates, remainingQuota: 1500 };
+    case "saveTemplate":
+      demoState.templates = demoState.templates.filter(t => t.name !== args[0].name).concat([args[0]]);
+      return demoState.templates;
+    case "deleteTemplate":
+      demoState.templates = demoState.templates.filter(t => t.name !== args[0]);
+      return demoState.templates;
+    case "sendBatch":
+      return args[0].map(it => ({serial: it.serial, name: it.name, email: it.email, status: "成功", error: ""}));
+    case "testSend":
+      return { ok: true, message: "(デモ)テスト送信しました: " + args[0].filename };
+    case "appendHistory":
+      return { url: "#" };
+    case "getHistory":
+      return { rows: [], url: "#" };
+  }
+}
+
+/* ---------- 初期化 ---------- */
+async function init() {
+  if (IS_DEMO) $("demoBanner").classList.remove("hidden");
+  try {
+    const d = await serverCall("getInitialData");
+    $("myEmail").textContent = d.email || "(取得できませんでした)";
+    $("quotaHint").textContent = "本日あと約 " + d.remainingQuota + " 通まで送信できます(Gmailの1日の上限)";
+    templates = d.templates || [];
+    renderTemplateSelect();
+  } catch (e) {
+    $("myEmail").textContent = "エラー: " + e.message;
+  }
+  updateGreetingPreview();
+}
+
+/* ---------- 宛名 ---------- */
+function setHonorific(h) {
+  honorific = h;
+  $("hon-kun").classList.toggle("active", h === "君");
+  $("hon-hogo").classList.toggle("active", h === "保護者様");
+  updateGreetingPreview();
+  renderPreviewTable();
+}
+function updateGreetingPreview() {
+  const sample = students.find(s => !s.skip);
+  const name = sample ? sample.name : "山田太郎";
+  const body = $("body").value.trim() || "(ここに本文が入ります)";
+  $("greetingPreview").textContent =
+    `▼ 本文プレビュー(例: ${name}さん宛て)\n\n${name}${honorific}\n\n${body}`;
+}
+
+/* ---------- テンプレート ---------- */
+function renderTemplateSelect() {
+  const sel = $("templateSelect");
+  sel.innerHTML = "";
+  for (const t of templates) {
+    const op = document.createElement("option");
+    op.value = t.name; op.textContent = t.name;
+    sel.appendChild(op);
+  }
+}
+function applyTemplate() {
+  const t = templates.find(t => t.name === $("templateSelect").value);
+  if (!t) { alert("テンプレートを選択してください。"); return; }
+  $("subject").value = t.subject || "";
+  $("body").value = t.body || "";
+  $("prefix").value = t.prefix || "";
+  if (t.honorific) setHonorific(t.honorific);
+  updateGreetingPreview();
+  renderPreviewTable();
+}
+async function saveTemplateUI() {
+  const name = prompt("テンプレート名を入力してください(同じ名前は上書きされます)", "標準");
+  if (!name) return;
+  templates = await serverCall("saveTemplate", {
+    name, subject: $("subject").value, body: $("body").value,
+    prefix: $("prefix").value, honorific,
+  });
+  renderTemplateSelect();
+  alert(`テンプレート「${name}」を保存しました。`);
+}
+async function deleteTemplateUI() {
+  const name = $("templateSelect").value;
+  if (!name) { alert("削除するテンプレートを選択してください。"); return; }
+  if (!confirm(`テンプレート「${name}」を削除しますか?`)) return;
+  templates = await serverCall("deleteTemplate", name);
+  renderTemplateSelect();
+}
+
+/* ---------- CSVテンプレートのダウンロード ---------- */
+function downloadCsvTemplate() {
+  const text = "通し番号(2以降は送りたい人数分を自分で入力),クラス,出席番号,生徒氏名,メールアドレス\r\n1,,,,\r\n";
+  const blob = new Blob(["﻿" + text], { type: "text/csv" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "メールアドレスリスト_テンプレート.csv";
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+/* ---------- CSVの解析(文字コード自動判別・説明付きヘッダー対応) ---------- */
+function decodeCsvBuffer(buf) {
+  try {
+    return new TextDecoder("utf-8", { fatal: true }).decode(buf);
+  } catch (e) {
+    return new TextDecoder("shift_jis").decode(buf);
+  }
+}
+function parseCsvRows(text) {
+  // 引用符("〜")対応の簡易CSVパーサ
+  const rows = [];
+  let row = [], cell = "", inQuote = false;
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (inQuote) {
+      if (c === '"') {
+        if (text[i + 1] === '"') { cell += '"'; i++; } else inQuote = false;
+      } else cell += c;
+    } else if (c === '"') inQuote = true;
+    else if (c === ",") { row.push(cell); cell = ""; }
+    else if (c === "\n" || c === "\r") {
+      if (c === "\r" && text[i + 1] === "\n") i++;
+      row.push(cell); rows.push(row); row = []; cell = "";
+    } else cell += c;
+  }
+  if (cell !== "" || row.length) { row.push(cell); rows.push(row); }
+  return rows.filter(r => r.some(c => c.trim() !== ""));
+}
+function parseCsv(text) {
+  const errors = [], warnings = [], students = [];
+  const rows = parseCsvRows(text);
+  if (!rows.length) return { students, errors: ["CSVファイルが空です。"], warnings };
+
+  const header = rows[0].map(h => h.trim());
+  const idx = {};
+  for (const col of REQUIRED_HEADERS) {
+    // 「通し番号(〜を自分で入力)」のような説明付きヘッダーも許容する
+    let i = header.findIndex(h => h === col);
+    if (i < 0) i = header.findIndex(h => h.startsWith(col));
+    if (i < 0) errors.push(`CSVの1行目に「${col}」の列が見つかりません。`);
+    else idx[col] = i;
+  }
+  if (errors.length) return { students, errors, warnings };
+
+  const seen = new Set();
+  rows.slice(1).forEach((row, k) => {
+    const lineNo = k + 2;
+    const cell = col => (row[idx[col]] || "").trim();
+    const serialRaw = cell("通し番号");
+    const serial = Number(serialRaw);
+    if (!Number.isInteger(serial)) {
+      errors.push(`${lineNo}行目: 通し番号「${serialRaw}」が数字ではありません。`);
+      return;
+    }
+    if (seen.has(serial)) {
+      errors.push(`${lineNo}行目: 通し番号 ${serial} が重複しています。`);
+      return;
+    }
+    seen.add(serial);
+
+    const name = cell("生徒氏名");
+    const email = cell("メールアドレス");
+    let skipReason = "";
+    if (!email) skipReason = "メールアドレスが空欄";
+    else if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) skipReason = "メールアドレスの形式が不正";
+    if (skipReason) {
+      warnings.push(`通し番号 ${serial}(${name || "氏名なし"}): ${skipReason} のためスキップされます。`);
+    }
+    students.push({
+      serial, class: cell("クラス"), number: cell("出席番号"),
+      name, email, skip: !!skipReason, skip_reason: skipReason,
+    });
+  });
+  if (!students.length) errors.push("CSVに生徒のデータ行がありません。");
+  return { students, errors, warnings };
+}
+
+/* ---------- ファイル読み込み ---------- */
+async function loadFiles() {
+  showMsg("uploadMsg", "", "");
+  filesValid = false;
+  const csvFile = $("csvFile").files[0];
+  const pdfFile = $("pdfFile").files[0];
+  const pagesPer = parseInt($("pagesPer").value, 10);
+  const errors = [];
+  if (!csvFile) errors.push("CSVファイルを選択してください。");
+  if (!pdfFile) errors.push("PDFファイルを選択してください。");
+  if (!Number.isInteger(pagesPer) || pagesPer < 1)
+    errors.push("「1人あたりのページ数」は1以上の数字で入力してください。");
+  if (errors.length) {
+    $("uploadMsg").innerHTML = `<div class="msg-error">${errors.map(esc).join("\n")}</div>`;
+    return;
+  }
+
+  $("uploadBtn").disabled = true;
+  try {
+    const parsed = parseCsv(decodeCsvBuffer(await csvFile.arrayBuffer()));
+    students = parsed.students;
+    const warnings = parsed.warnings;
+    errors.push(...parsed.errors);
+
+    let totalPages = 0;
+    srcPdfDoc = null;
+    try {
+      srcPdfDoc = await PDFLib.PDFDocument.load(await pdfFile.arrayBuffer(), { ignoreEncryption: true });
+      totalPages = srcPdfDoc.getPageCount();
+    } catch (e) {
+      errors.push("PDFファイルを読み込めませんでした。ファイルが壊れていないか確認してください。");
+    }
+
+    if (students.length && totalPages) {
+      const expected = students.length * pagesPer;
+      if (totalPages !== expected) {
+        errors.push(`PDFのページ数(${totalPages}ページ)が「人数 ${students.length}名 × ${pagesPer}ページ = ${expected}ページ」と一致しません。送信できません。`);
+      }
+      for (const st of students) {
+        st.page_start = (st.serial - 1) * pagesPer + 1;
+        st.page_end = st.serial * pagesPer;
+        if (st.page_end > totalPages) {
+          errors.push(`通し番号 ${st.serial}(${st.name || "氏名なし"}): 割り当てページ(${st.page_start}〜${st.page_end})がPDFの範囲外です。`);
+        }
+      }
+    }
+
+    filesValid = errors.length === 0;
+    let html = "";
+    if (errors.length) html += `<div class="msg-error">${errors.map(esc).join("\n")}</div>`;
+    if (warnings.length) html += `<div class="msg-warn">${warnings.map(esc).join("\n")}</div>`;
+    if (filesValid) {
+      const sendable = students.filter(s => !s.skip).length;
+      html += `<div class="msg-ok">読み込みOK: ${students.length}名(送信対象 ${sendable}名) / PDF ${totalPages}ページ / 1人あたり ${pagesPer}ページ</div>`;
+    }
+    $("uploadMsg").innerHTML = html;
+    $("previewArea").classList.toggle("hidden", students.length === 0);
+    renderPreviewTable();
+    updateGreetingPreview();
+  } finally {
+    $("uploadBtn").disabled = false;
+  }
+}
+function renderPreviewTable() {
+  const tbody = $("previewTable").querySelector("tbody");
+  tbody.innerHTML = "";
+  for (const s of students) {
+    const tr = document.createElement("tr");
+    if (s.skip) tr.className = "skip";
+    const pages = s.page_start
+      ? (s.page_start === s.page_end ? `${s.page_start}` : `${s.page_start}〜${s.page_end}`)
+      : "-";
+    tr.innerHTML = `
+      <td>${esc(s.serial)}</td><td>${esc(s.class)}</td><td>${esc(s.number)}</td>
+      <td>${esc(s.name)}${esc(s.name ? honorific : "")}</td>
+      <td>${esc(s.email)}</td><td>${esc(pages)}</td>
+      <td>${s.skip ? "-" : esc(attachName(s.name))}</td>
+      <td>${s.skip ? "⚠ スキップ(" + esc(s.skip_reason) + ")" : "送信対象"}</td>`;
+    tbody.appendChild(tr);
+  }
+}
+
+/* ---------- PDF分割(ブラウザ内で実行) ---------- */
+async function makeStudentPdfB64(st) {
+  const doc = await PDFLib.PDFDocument.create();
+  const indices = [];
+  for (let p = st.page_start - 1; p < st.page_end; p++) indices.push(p);
+  const pages = await doc.copyPages(srcPdfDoc, indices);
+  pages.forEach(p => doc.addPage(p));
+  return await doc.saveAsBase64();
+}
+
+/* ---------- 送信 ---------- */
+function checkReady() {
+  if (!filesValid) {
+    alert("先に STEP 2 で「読み込んでチェック」を実行し、エラーを解消してください。");
+    return false;
+  }
+  const missing = [];
+  if (!$("subject").value.trim()) missing.push("件名");
+  if (!$("body").value.trim()) missing.push("本文");
+  if (!$("prefix").value.trim()) missing.push("添付ファイル名の頭");
+  if (missing.length) {
+    alert("STEP 3 の次の項目を入力してください: " + missing.join("・"));
+    return false;
+  }
+  return true;
+}
+function meta() {
+  return { subject: $("subject").value.trim(), body: $("body").value, honorific };
+}
+async function testSendUI() {
+  if (!checkReady()) return;
+  const sample = students.find(s => !s.skip);
+  if (!sample) { showMsg("sendMsg", "error", "送信可能な生徒(メールアドレスあり)が1人もいません。"); return; }
+  $("testBtn").disabled = true; $("sendBtn").disabled = true;
+  showMsg("sendMsg", "warn", "テスト送信中です…");
+  try {
+    const item = {
+      serial: sample.serial, name: sample.name, email: sample.email,
+      filename: attachName(sample.name), pdfB64: await makeStudentPdfB64(sample),
+    };
+    const res = await serverCall("testSend", item, meta());
+    showMsg("sendMsg", res.ok ? "ok" : "error", res.message);
+  } catch (e) {
+    showMsg("sendMsg", "error", "テスト送信に失敗しました: " + e.message);
+  } finally {
+    $("testBtn").disabled = false; $("sendBtn").disabled = false;
+  }
+}
+async function realSend(serials) {
+  if (!checkReady() || sending) return;
+  let targets = students.filter(s => !s.skip);
+  if (serials) {
+    const set = new Set(serials);
+    targets = targets.filter(s => set.has(s.serial));
+  }
+  if (!targets.length) { alert("送信対象がいません。"); return; }
+  const label = serials ? "再送信" : "本送信";
+  const mins = Math.max(1, Math.ceil(targets.length / 30));
+  if (!confirm(`${targets.length}名に${label}します。よろしいですか?\n(送信には数分〜${mins + 5}分ほどかかることがあります。送信が終わるまでこの画面を閉じないでください)`)) return;
+
+  sending = true; cancelFlag = false; lastResults = [];
+  $("sendBtn").disabled = true; $("testBtn").disabled = true;
+  $("cancelBtn").classList.remove("hidden");
+  $("resendBtn").classList.add("hidden");
+  $("progressArea").classList.remove("hidden");
+  $("resultTable").querySelector("tbody").innerHTML = "";
+  showMsg("sendMsg", "", "");
+
+  try {
+    let i = 0;
+    while (i < targets.length && !cancelFlag) {
+      // バッチを組み立てる(人数とサイズの両方で制限)
+      const items = [];
+      let b64Total = 0;
+      while (i < targets.length && items.length < BATCH_MAX_ITEMS && !cancelFlag) {
+        const st = targets[i];
+        updateProgress(lastResults.length, targets.length, `${st.name || st.email} のPDFを準備中…`);
+        const b64 = await makeStudentPdfB64(st);
+        if (items.length && b64Total + b64.length > BATCH_MAX_B64) break;
+        items.push({ serial: st.serial, name: st.name, email: st.email,
+                     filename: attachName(st.name), pdfB64: b64 });
+        b64Total += b64.length;
+        i++;
+      }
+      if (!items.length) break;
+      updateProgress(lastResults.length, targets.length,
+        `${items[0].name} 〜 ${items[items.length - 1].name} を送信中…`);
+      const results = await serverCall("sendBatch", items, meta());
+      lastResults.push(...results);
+      renderResults(lastResults);
+      updateProgress(lastResults.length, targets.length, "");
+    }
+  } catch (e) {
+    showMsg("sendMsg", "error", `送信中にエラーが発生しました: ${e.message}\nここまでの結果は下の表の通りです。`);
+  } finally {
+    sending = false;
+    $("cancelBtn").classList.add("hidden");
+    $("sendBtn").disabled = false; $("testBtn").disabled = false;
+    // 履歴を記録(1件でも送っていれば)
+    if (lastResults.length) {
+      try { await serverCall("appendHistory", { mode: label, subject: $("subject").value.trim(), results: lastResults }); }
+      catch (e) { /* 履歴の失敗は送信結果に影響しない */ }
+    }
+    const fails = lastResults.filter(r => r.status === "失敗");
+    const oks = lastResults.filter(r => r.status === "成功");
+    updateProgress(lastResults.length, targets.length, cancelFlag ? "中断されました。" : "完了");
+    if (cancelFlag) {
+      showMsg("sendMsg", "warn", `${label}を中断しました: 送信済み ${oks.length}件 / 失敗 ${fails.length}件(残りは未送信)`);
+      if (fails.length) $("resendBtn").classList.remove("hidden");
+    } else if (fails.length) {
+      showMsg("sendMsg", "error", `${label}が終了しました: 成功 ${oks.length}件 / 失敗 ${fails.length}件。下の「失敗した人だけ再送信」で再送できます。`);
+      $("resendBtn").classList.remove("hidden");
+    } else if (oks.length) {
+      showMsg("sendMsg", "ok", `${label}が完了しました: 成功 ${oks.length}件 / 失敗 0件`);
+    }
+  }
+}
+function updateProgress(done, total, message) {
+  const pct = total ? Math.round(done / total * 100) : 0;
+  $("progressBar").style.width = pct + "%";
+  $("progressBar").textContent = pct + "%";
+  $("progressText").textContent = `${done} / ${total} 件  ${message || ""}`;
+}
+function renderResults(results) {
+  const tbody = $("resultTable").querySelector("tbody");
+  tbody.innerHTML = "";
+  for (const r of results) {
+    const tr = document.createElement("tr");
+    if (r.status === "失敗") tr.className = "fail";
+    tr.innerHTML = `<td>${esc(r.serial)}</td><td>${esc(r.name)}</td>
+      <td>${esc(r.email)}</td><td>${r.status === "成功" ? "✅ 成功" : "❌ 失敗"}</td>
+      <td>${esc(r.error)}</td>`;
+    tbody.appendChild(tr);
+  }
+}
+function cancelSend() {
+  if (!sending) return;
+  if (!confirm("送信を中断しますか?(すでに送信された分は取り消せません)")) return;
+  cancelFlag = true;
+  $("progressText").textContent += " (中断しています…今のグループの送信が終わり次第止まります)";
+}
+function resendFailed() {
+  const serials = lastResults.filter(r => r.status === "失敗").map(r => r.serial);
+  if (!serials.length) { alert("失敗した送信はありません。"); return; }
+  realSend(serials);
+}
+
+/* ---------- 履歴 ---------- */
+async function toggleHistory() {
+  const card = $("historyCard");
+  if (!card.classList.contains("hidden")) { card.classList.add("hidden"); return; }
+  const tbody = $("historyTable").querySelector("tbody");
+  tbody.innerHTML = "<tr><td colspan='8'>読み込み中…</td></tr>";
+  card.classList.remove("hidden");
+  try {
+    const d = await serverCall("getHistory");
+    $("historyLink").innerHTML = d.url && d.url !== "#"
+      ? `履歴はGoogleスプレッドシートにも保存されています: <a href="${esc(d.url)}" target="_blank" rel="noopener">シートを開く</a>`
+      : "";
+    tbody.innerHTML = "";
+    for (const row of d.rows) {
+      const tr = document.createElement("tr");
+      if (row[6] === "失敗") tr.className = "fail";
+      tr.innerHTML = row.map(c => `<td>${esc(c)}</td>`).join("");
+      tbody.appendChild(tr);
+    }
+    if (!d.rows.length) tbody.innerHTML = "<tr><td colspan='8'>履歴はまだありません。</td></tr>";
+  } catch (e) {
+    tbody.innerHTML = `<tr><td colspan='8'>履歴の読み込みに失敗しました: ${esc(e.message)}</td></tr>`;
+  }
+}
+
+document.getElementById("body").addEventListener("input", updateGreetingPreview);
+document.getElementById("prefix").addEventListener("input", renderPreviewTable);
+init();
+</script>
+</body>
+</html>
