@@ -53,6 +53,7 @@ function deleteTemplate(name) {
 /**
  * 1バッチ(数名分)を送信する。ブラウザ側が分割済みPDF(Base64)を渡してくる。
  * items: [{serial, name, email, filename, pdfB64}]
+ *   pdfB64 が空のときは添付なし(本文のみ)で送信する。
  * meta:  {subject, body, honorific}
  */
 function sendBatch(items, meta) {
@@ -61,10 +62,13 @@ function sendBatch(items, meta) {
     var it = items[i];
     var r = { serial: it.serial, name: it.name, email: it.email, status: '成功', error: '' };
     try {
-      var blob = Utilities.newBlob(
-        Utilities.base64Decode(it.pdfB64), 'application/pdf', it.filename);
+      var opts = {};
+      if (it.pdfB64) {
+        opts.attachments = [Utilities.newBlob(
+          Utilities.base64Decode(it.pdfB64), 'application/pdf', it.filename)];
+      }
       var body = it.name + meta.honorific + '\n\n' + meta.body;
-      GmailApp.sendEmail(it.email, meta.subject, body, { attachments: [blob] });
+      GmailApp.sendEmail(it.email, meta.subject, body, opts);
     } catch (e) {
       r.status = '失敗';
       r.error = String(e.message || e);
@@ -79,13 +83,17 @@ function sendBatch(items, meta) {
 function testSend(item, meta) {
   var me = Session.getActiveUser().getEmail();
   try {
-    var blob = Utilities.newBlob(
-      Utilities.base64Decode(item.pdfB64), 'application/pdf', item.filename);
+    var opts = {};
+    if (item.pdfB64) {
+      opts.attachments = [Utilities.newBlob(
+        Utilities.base64Decode(item.pdfB64), 'application/pdf', item.filename)];
+    }
     var body = '※これはテスト送信です。実際には各生徒(保護者)のアドレスへ送信されます。\n' +
       '※以下は 通し番号 ' + item.serial + '(' + item.name + ')さん宛ての内容の例です。\n' +
+      (item.pdfB64 ? '' : '※添付なし(本文のみ)の送信です。\n') +
       '--------------------\n' +
       item.name + meta.honorific + '\n\n' + meta.body;
-    GmailApp.sendEmail(me, '【テスト送信】' + meta.subject, body, { attachments: [blob] });
+    GmailApp.sendEmail(me, '【テスト送信】' + meta.subject, body, opts);
     appendHistory({
       mode: 'テスト送信', subject: meta.subject,
       results: [{ serial: item.serial, name: item.name, email: me, status: '成功', error: '' }],

@@ -152,10 +152,14 @@
       <div>
         <label>PDFファイル(全員分がまとまった1つのファイル)</label>
         <input type="file" id="pdfFile" accept=".pdf,application/pdf">
+        <div class="hint">
+          PDFを添付しない場合(本文だけの連絡)は、空のままで大丈夫です。
+        </div>
       </div>
       <div class="narrow">
         <label>1人あたりのページ数</label>
         <input type="number" id="pagesPer" value="1" min="1">
+        <div class="hint">PDFなしのときは使いません。</div>
       </div>
     </div>
     <div class="btnrow">
@@ -189,7 +193,8 @@
       <div>
         <label>添付ファイル名の頭</label>
         <input type="text" id="prefix" placeholder="例: 面談案内">
-        <div class="hint">添付ファイル名は「(頭)_(生徒氏名).pdf」になります。例: 面談案内_山田太郎.pdf</div>
+        <div class="hint">添付ファイル名は「(頭)_(生徒氏名).pdf」になります。例: 面談案内_山田太郎.pdf<br>
+        PDFを添付しない場合は入力不要です。</div>
       </div>
     </div>
     <label>本文(全員共通)</label>
@@ -234,6 +239,7 @@ const BATCH_MAX_B64 = 10 * 1024 * 1024; // 1回の呼び出しのPDF合計サイ
 
 let students = [];
 let srcPdfDoc = null;   // pdf-lib のドキュメント(読み込み済みPDF)
+let hasPdf = false;     // false のときは添付なし(本文のみ)で送信
 let filesValid = false;
 let honorific = "保護者様";
 let cancelFlag = false;
@@ -456,8 +462,7 @@ async function loadFiles() {
   const pagesPer = parseInt($("pagesPer").value, 10);
   const errors = [];
   if (!csvFile) errors.push("CSVファイルを選択してください。");
-  if (!pdfFile) errors.push("PDFファイルを選択してください。");
-  if (!Number.isInteger(pagesPer) || pagesPer < 1)
+  if (pdfFile && (!Number.isInteger(pagesPer) || pagesPer < 1))
     errors.push("「1人あたりのページ数」は1以上の数字で入力してください。");
   if (errors.length) {
     $("uploadMsg").innerHTML = `<div class="msg-error">${errors.map(esc).join("\n")}</div>`;
@@ -473,11 +478,16 @@ async function loadFiles() {
 
     let totalPages = 0;
     srcPdfDoc = null;
-    try {
-      srcPdfDoc = await PDFLib.PDFDocument.load(await pdfFile.arrayBuffer(), { ignoreEncryption: true });
-      totalPages = srcPdfDoc.getPageCount();
-    } catch (e) {
-      errors.push("PDFファイルを読み込めませんでした。ファイルが壊れていないか確認してください。");
+    hasPdf = !!pdfFile;
+    if (pdfFile) {
+      try {
+        srcPdfDoc = await PDFLib.PDFDocument.load(await pdfFile.arrayBuffer(), { ignoreEncryption: true });
+        totalPages = srcPdfDoc.getPageCount();
+      } catch (e) {
+        errors.push("PDFファイルを読み込めませんでした。ファイルが壊れていないか確認してください。");
+      }
+    } else {
+      warnings.unshift("PDFが選択されていません。添付なし(宛名+本文のみ)で送信されます。");
     }
 
     if (students.length && totalPages) {
@@ -500,7 +510,8 @@ async function loadFiles() {
     if (warnings.length) html += `<div class="msg-warn">${warnings.map(esc).join("\n")}</div>`;
     if (filesValid) {
       const sendable = students.filter(s => !s.skip).length;
-      html += `<div class="msg-ok">読み込みOK: ${students.length}名(送信対象 ${sendable}名) / PDF ${totalPages}ページ / 1人あたり ${pagesPer}ページ</div>`;
+      const pdfInfo = hasPdf ? `PDF ${totalPages}ページ / 1人あたり ${pagesPer}ページ` : "添付なし(本文のみ)";
+      html += `<div class="msg-ok">読み込みOK: ${students.length}名(送信対象 ${sendable}名) / ${pdfInfo}</div>`;
     }
     $("uploadMsg").innerHTML = html;
     $("previewArea").classList.toggle("hidden", students.length === 0);
@@ -516,14 +527,14 @@ function renderPreviewTable() {
   for (const s of students) {
     const tr = document.createElement("tr");
     if (s.skip) tr.className = "skip";
-    const pages = s.page_start
+    const pages = (hasPdf && s.page_start)
       ? (s.page_start === s.page_end ? `${s.page_start}` : `${s.page_start}〜${s.page_end}`)
       : "-";
     tr.innerHTML = `
       <td>${esc(s.serial)}</td><td>${esc(s.class)}</td><td>${esc(s.number)}</td>
       <td>${esc(s.name)}${esc(s.name ? honorific : "")}</td>
       <td>${esc(s.email)}</td><td>${esc(pages)}</td>
-      <td>${s.skip ? "-" : esc(attachName(s.name))}</td>
+      <td>${s.skip || !hasPdf ? (hasPdf ? "-" : "添付なし") : esc(attachName(s.name))}</td>
       <td>${s.skip ? "⚠ スキップ(" + esc(s.skip_reason) + ")" : "送信対象"}</td>`;
     tbody.appendChild(tr);
   }
@@ -548,7 +559,7 @@ function checkReady() {
   const missing = [];
   if (!$("subject").value.trim()) missing.push("件名");
   if (!$("body").value.trim()) missing.push("本文");
-  if (!$("prefix").value.trim()) missing.push("添付ファイル名の頭");
+  if (hasPdf && !$("prefix").value.trim()) missing.push("添付ファイル名の頭");
   if (missing.length) {
     alert("STEP 3 の次の項目を入力してください: " + missing.join("・"));
     return false;
@@ -567,7 +578,8 @@ async function testSendUI() {
   try {
     const item = {
       serial: sample.serial, name: sample.name, email: sample.email,
-      filename: attachName(sample.name), pdfB64: await makeStudentPdfB64(sample),
+      filename: hasPdf ? attachName(sample.name) : "",
+      pdfB64: hasPdf ? await makeStudentPdfB64(sample) : "",
     };
     const res = await serverCall("testSend", item, meta());
     showMsg("sendMsg", res.ok ? "ok" : "error", res.message);
@@ -587,7 +599,8 @@ async function realSend(serials) {
   if (!targets.length) { alert("送信対象がいません。"); return; }
   const label = serials ? "再送信" : "本送信";
   const mins = Math.max(1, Math.ceil(targets.length / 30));
-  if (!confirm(`${targets.length}名に${label}します。よろしいですか?\n(送信には数分〜${mins + 5}分ほどかかることがあります。送信が終わるまでこの画面を閉じないでください)`)) return;
+  const attachInfo = hasPdf ? "" : "\n※PDFの添付なし(宛名+本文のみ)で送信します。";
+  if (!confirm(`${targets.length}名に${label}します。よろしいですか?${attachInfo}\n(送信には数分〜${mins + 5}分ほどかかることがあります。送信が終わるまでこの画面を閉じないでください)`)) return;
 
   sending = true; cancelFlag = false; lastResults = [];
   $("sendBtn").disabled = true; $("testBtn").disabled = true;
@@ -605,11 +618,14 @@ async function realSend(serials) {
       let b64Total = 0;
       while (i < targets.length && items.length < BATCH_MAX_ITEMS && !cancelFlag) {
         const st = targets[i];
-        updateProgress(lastResults.length, targets.length, `${st.name || st.email} のPDFを準備中…`);
-        const b64 = await makeStudentPdfB64(st);
-        if (items.length && b64Total + b64.length > BATCH_MAX_B64) break;
+        let b64 = "";
+        if (hasPdf) {
+          updateProgress(lastResults.length, targets.length, `${st.name || st.email} のPDFを準備中…`);
+          b64 = await makeStudentPdfB64(st);
+          if (items.length && b64Total + b64.length > BATCH_MAX_B64) break;
+        }
         items.push({ serial: st.serial, name: st.name, email: st.email,
-                     filename: attachName(st.name), pdfB64: b64 });
+                     filename: hasPdf ? attachName(st.name) : "", pdfB64: b64 });
         b64Total += b64.length;
         i++;
       }
