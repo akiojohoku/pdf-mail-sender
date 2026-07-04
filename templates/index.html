@@ -1,0 +1,557 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PDF個別メール送信システム</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    font-family: "Hiragino Sans", "Yu Gothic UI", "Meiryo", sans-serif;
+    margin: 0; background: #f0f4f8; color: #1a2733;
+  }
+  header {
+    background: #1e5b8a; color: #fff; padding: 14px 24px;
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  header h1 { font-size: 20px; margin: 0; }
+  header button {
+    background: #fff; color: #1e5b8a; border: none; border-radius: 6px;
+    padding: 8px 16px; font-size: 14px; cursor: pointer; font-weight: bold;
+  }
+  main { max-width: 980px; margin: 0 auto; padding: 20px 16px 60px; }
+  .card {
+    background: #fff; border-radius: 10px; padding: 20px 24px;
+    margin-bottom: 18px; box-shadow: 0 1px 4px rgba(0,0,0,.08);
+  }
+  .card h2 {
+    font-size: 16px; margin: 0 0 14px; padding-bottom: 8px;
+    border-bottom: 2px solid #1e5b8a;
+  }
+  .card h2 .step {
+    background: #1e5b8a; color: #fff; border-radius: 12px;
+    padding: 2px 12px; font-size: 13px; margin-right: 8px;
+  }
+  label { display: block; font-size: 13px; font-weight: bold; margin: 12px 0 4px; }
+  input[type=text], input[type=email], input[type=password], input[type=number],
+  textarea, select {
+    width: 100%; padding: 9px 10px; font-size: 15px;
+    border: 1px solid #b6c4d0; border-radius: 6px; background: #fff;
+  }
+  textarea { min-height: 140px; resize: vertical; line-height: 1.6; }
+  input[type=file] { font-size: 14px; }
+  .row { display: flex; gap: 16px; flex-wrap: wrap; }
+  .row > div { flex: 1; min-width: 220px; }
+  .row > div.narrow { flex: 0 0 170px; min-width: 150px; }
+  button.primary, button.secondary, button.danger {
+    border: none; border-radius: 6px; padding: 11px 22px; font-size: 15px;
+    cursor: pointer; font-weight: bold;
+  }
+  button.primary { background: #1e5b8a; color: #fff; }
+  button.secondary { background: #e3ecf3; color: #1e5b8a; }
+  button.danger { background: #c0392b; color: #fff; }
+  button:disabled { opacity: .45; cursor: not-allowed; }
+  .toggle { display: inline-flex; border: 2px solid #1e5b8a; border-radius: 8px; overflow: hidden; }
+  .toggle button {
+    border: none; background: #fff; color: #1e5b8a; padding: 10px 26px;
+    font-size: 15px; cursor: pointer; font-weight: bold;
+  }
+  .toggle button.active { background: #1e5b8a; color: #fff; }
+  .msg-error, .msg-warn, .msg-ok {
+    border-radius: 6px; padding: 10px 14px; margin: 10px 0; font-size: 14px;
+    white-space: pre-wrap; line-height: 1.6;
+  }
+  .msg-error { background: #fdecea; color: #b71c1c; border: 1px solid #f5c6c0; }
+  .msg-warn  { background: #fff8e1; color: #7a5b00; border: 1px solid #f0e0a0; }
+  .msg-ok    { background: #e8f5e9; color: #1b5e20; border: 1px solid #bfe3c2; }
+  table { border-collapse: collapse; width: 100%; font-size: 13px; margin-top: 10px; }
+  th, td { border: 1px solid #d4dee6; padding: 6px 8px; text-align: left; }
+  th { background: #eef4f8; }
+  tr.skip td { background: #fafafa; color: #999; }
+  tr.fail td { background: #fdecea; }
+  .greeting-preview {
+    background: #f5f8fa; border: 1px dashed #9db4c4; border-radius: 6px;
+    padding: 12px 14px; font-size: 14px; margin-top: 12px; white-space: pre-wrap;
+    line-height: 1.6;
+  }
+  .progress-outer {
+    background: #e3ecf3; border-radius: 8px; height: 26px; overflow: hidden; margin: 12px 0;
+  }
+  .progress-inner {
+    background: #2e8b57; height: 100%; width: 0; transition: width .4s;
+    color: #fff; font-size: 13px; font-weight: bold;
+    display: flex; align-items: center; justify-content: center; min-width: 0;
+  }
+  .hint { font-size: 12px; color: #607585; margin-top: 4px; line-height: 1.6; }
+  .helpbox {
+    background: #f5f8fa; border: 1px solid #c9d8e4; border-radius: 8px;
+    padding: 10px 14px; margin-top: 10px; font-size: 13px; line-height: 1.7;
+  }
+  .helpbox summary {
+    cursor: pointer; font-weight: bold; color: #1e5b8a; font-size: 14px;
+  }
+  .helpbox ol, .helpbox ul { margin: 8px 0; padding-left: 22px; }
+  .helpbox li { margin-bottom: 4px; }
+  .helpbox p { margin: 8px 0 2px; }
+  .helpbox a { color: #1e5b8a; word-break: break-all; }
+  .hidden { display: none; }
+  .btnrow { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 14px; align-items: center; }
+  #historyDetail td, #historyDetail th { font-size: 12px; }
+  .scrollbox { max-height: 340px; overflow-y: auto; border: 1px solid #d4dee6; border-radius: 6px; }
+  .scrollbox table { margin-top: 0; }
+  .scrollbox th { position: sticky; top: 0; }
+</style>
+</head>
+<body>
+<header>
+  <h1>📧 PDF個別メール送信システム</h1>
+  <button onclick="toggleHistory()">📋 送信履歴</button>
+</header>
+<main>
+
+  <!-- 履歴 -->
+  <div class="card hidden" id="historyCard">
+    <h2>送信履歴</h2>
+    <div class="scrollbox"><table id="historyTable">
+      <thead><tr><th>日時</th><th>送信者</th><th>種別</th><th>件名</th><th>成功</th><th>失敗</th><th></th></tr></thead>
+      <tbody></tbody>
+    </table></div>
+    <div id="historyDetail"></div>
+  </div>
+
+  <!-- STEP 1 送信元 -->
+  <div class="card">
+    <h2><span class="step">STEP 1</span>送信元(あなた)のメールアドレス</h2>
+    <div class="row">
+      <div>
+        <label>送信元メールアドレス</label>
+        <input type="email" id="sender" placeholder="例: a-inoue@johoku.ac.jp" onchange="loadTemplates()">
+      </div>
+      <div>
+        <label>保存済みテンプレート</label>
+        <div style="display:flex; gap:8px;">
+          <select id="templateSelect"></select>
+          <button class="secondary" onclick="applyTemplate()">読込</button>
+          <button class="secondary" onclick="deleteTemplate()">削除</button>
+        </div>
+        <div class="hint">アドレスを入力すると、あなたが保存したテンプレートが表示されます。</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- STEP 2 ファイル -->
+  <div class="card">
+    <h2><span class="step">STEP 2</span>名簿CSVとPDFの読み込み</h2>
+    <div class="row">
+      <div>
+        <label>名簿CSVファイル(通し番号・クラス・出席番号・生徒氏名・メールアドレス)</label>
+        <input type="file" id="csvFile" accept=".csv,text/csv">
+        <div class="hint">
+          <a href="/api/csv_template" download>📄 CSVテンプレートをダウンロード</a>
+          — 初めての方はこれをダウンロードし、Excelなどで名簿を入力してから
+          この欄にアップロードしてください。
+        </div>
+      </div>
+      <div>
+        <label>PDFファイル(全員分がまとまった1つのファイル)</label>
+        <input type="file" id="pdfFile" accept=".pdf,application/pdf">
+      </div>
+      <div class="narrow">
+        <label>1人あたりのページ数</label>
+        <input type="number" id="pagesPer" value="1" min="1">
+      </div>
+    </div>
+    <div class="btnrow">
+      <button class="primary" onclick="uploadFiles()" id="uploadBtn">📂 読み込んでチェック</button>
+    </div>
+    <div id="uploadMsg"></div>
+    <div id="previewArea" class="hidden">
+      <div class="scrollbox"><table id="previewTable">
+        <thead><tr>
+          <th>通し番号</th><th>クラス</th><th>番号</th><th>生徒氏名</th>
+          <th>メールアドレス</th><th>PDFページ</th><th>添付ファイル名</th><th>状態</th>
+        </tr></thead>
+        <tbody></tbody>
+      </table></div>
+    </div>
+  </div>
+
+  <!-- STEP 3 メール内容 -->
+  <div class="card">
+    <h2><span class="step">STEP 3</span>メールの内容</h2>
+    <label>宛名(本文の先頭に自動で入ります・全員共通)</label>
+    <div class="toggle">
+      <button id="hon-kun" onclick="setHonorific('君')">(生徒氏名)君</button>
+      <button id="hon-hogo" class="active" onclick="setHonorific('保護者様')">(生徒氏名)保護者様</button>
+    </div>
+    <div class="row">
+      <div>
+        <label>件名</label>
+        <input type="text" id="subject" placeholder="例: 三者面談のご案内">
+      </div>
+      <div>
+        <label>添付ファイル名の頭</label>
+        <input type="text" id="prefix" placeholder="例: 面談案内">
+        <div class="hint">添付ファイル名は「(頭)_(生徒氏名).pdf」になります。例: 面談案内_山田太郎.pdf</div>
+      </div>
+    </div>
+    <label>本文(全員共通)</label>
+    <textarea id="body" placeholder="いつもお世話になっております。&#10;添付のPDFをご確認ください。"></textarea>
+    <div class="greeting-preview" id="greetingPreview"></div>
+    <div class="btnrow">
+      <button class="secondary" onclick="saveTemplate()">💾 この内容をテンプレートとして保存</button>
+    </div>
+  </div>
+
+  <!-- STEP 4 送信 -->
+  <div class="card">
+    <h2><span class="step">STEP 4</span>テスト送信と本送信</h2>
+    <div class="row">
+      <div>
+        <label>Gmailアプリパスワード(16文字)</label>
+        <input type="password" id="password" placeholder="例: abcd efgh ijkl mnop(スペースは入っていてもOK)">
+        <div class="hint">
+          Googleが発行する16文字の専用パスワードです(普段のログインパスワードとは別物)。
+          このパスワードはサーバーには保存されず、送信のたびに入力が必要です。
+        </div>
+        <details class="helpbox">
+          <summary>❓ アプリパスワードの取得方法(クリックで開く)</summary>
+          <ol>
+            <li>ブラウザで
+              <a href="https://myaccount.google.com/apppasswords" target="_blank" rel="noopener">https://myaccount.google.com/apppasswords</a>
+              を開く(学校のGoogleアカウントでログインした状態で)</li>
+            <li>パスワードの再入力を求められたら、普段のログインパスワードを入力</li>
+            <li>「アプリ名」に分かりやすい名前(例: <b>PDF送信</b>)を入力して「<b>作成</b>」</li>
+            <li>黄色い枠に表示された <b>16文字</b> を必ずメモする
+              (<b>この画面を閉じると二度と表示されません</b>。忘れた場合は削除して再発行すればOK)</li>
+            <li>その16文字を上の入力欄に貼り付ける(スペース入りのままでOK)</li>
+          </ol>
+          <p><b>上のページが開けない場合:</b></p>
+          <ul>
+            <li><a href="https://myaccount.google.com" target="_blank" rel="noopener">myaccount.google.com</a>
+              上部の検索窓で「<b>アプリ パスワード</b>」と検索して開く
+              (「セキュリティ → 2段階認証プロセス」のページ内にリンクが表示されないことがあります)</li>
+            <li>「2段階認証プロセス」が無効の場合は、先に「セキュリティ → 2段階認証プロセス」で有効にする</li>
+            <li>それでも表示されない場合は、学校のGoogle Workspace管理者に
+              「アプリパスワードの利用許可」を依頼してください</li>
+          </ul>
+          <p>発行は先生ごとに<b>1回だけ</b>です。メモしておけば毎回同じものを入力して使えます。</p>
+        </details>
+      </div>
+    </div>
+    <div class="btnrow">
+      <button class="secondary" onclick="testSend()" id="testBtn">✉️ 自分宛てにテスト送信(1通)</button>
+      <button class="primary" onclick="realSend()" id="sendBtn">🚀 本送信を開始</button>
+      <button class="danger hidden" onclick="cancelSend()" id="cancelBtn">⛔ 中断</button>
+    </div>
+    <div id="sendMsg"></div>
+    <div id="progressArea" class="hidden">
+      <div class="progress-outer"><div class="progress-inner" id="progressBar"></div></div>
+      <div id="progressText" style="font-size:14px; font-weight:bold;"></div>
+      <div class="scrollbox"><table id="resultTable">
+        <thead><tr><th>通し番号</th><th>生徒氏名</th><th>メールアドレス</th><th>結果</th><th>エラー内容</th></tr></thead>
+        <tbody></tbody>
+      </table></div>
+      <div class="btnrow">
+        <button class="danger hidden" id="resendBtn" onclick="resendFailed()">🔁 失敗した人だけ再送信</button>
+      </div>
+    </div>
+  </div>
+
+</main>
+<script>
+let jobId = "";
+let students = [];
+let honorific = "保護者様";
+let pollTimer = null;
+let lastResults = [];
+let currentMode = "";
+
+const $ = id => document.getElementById(id);
+
+function esc(s) {
+  return String(s ?? "").replace(/[&<>"']/g,
+    c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+}
+function showMsg(el, type, text) {
+  $(el).innerHTML = text ? `<div class="msg-${type}">${esc(text)}</div>` : "";
+}
+function attachName(name) {
+  const prefix = $("prefix").value.trim() || "(頭)";
+  return `${prefix}_${String(name || "").replace(/\s+/g, "")}.pdf`;
+}
+
+/* ---------- 宛名 ---------- */
+function setHonorific(h) {
+  honorific = h;
+  $("hon-kun").classList.toggle("active", h === "君");
+  $("hon-hogo").classList.toggle("active", h === "保護者様");
+  updateGreetingPreview();
+  renderPreviewTable();
+}
+function updateGreetingPreview() {
+  const sample = students.find(s => !s.skip);
+  const name = sample ? sample.name : "山田太郎";
+  const body = $("body").value.trim() || "(ここに本文が入ります)";
+  $("greetingPreview").textContent =
+    `▼ 本文プレビュー(例: ${name}さん宛て)\n\n${name}${honorific}\n\n${body}`;
+}
+["body"].forEach(id => $(id).addEventListener("input", updateGreetingPreview));
+$("prefix").addEventListener("input", renderPreviewTable);
+
+/* ---------- テンプレート ---------- */
+async function loadTemplates() {
+  const email = $("sender").value.trim();
+  const sel = $("templateSelect");
+  sel.innerHTML = "";
+  if (!email) return;
+  const res = await fetch(`/api/templates?email=${encodeURIComponent(email)}`);
+  const data = await res.json();
+  for (const t of data.templates) {
+    const op = document.createElement("option");
+    op.value = t.name; op.textContent = t.name;
+    sel.appendChild(op);
+  }
+  window._templates = data.templates;
+}
+function applyTemplate() {
+  const name = $("templateSelect").value;
+  const t = (window._templates || []).find(t => t.name === name);
+  if (!t) { alert("テンプレートを選択してください。"); return; }
+  $("subject").value = t.subject || "";
+  $("body").value = t.body || "";
+  $("prefix").value = t.prefix || "";
+  if (t.honorific) setHonorific(t.honorific);
+  updateGreetingPreview();
+  renderPreviewTable();
+}
+async function saveTemplate() {
+  const email = $("sender").value.trim();
+  if (!email) { alert("先に STEP 1 で送信元メールアドレスを入力してください。"); return; }
+  const name = prompt("テンプレート名を入力してください(同じ名前は上書きされます)", "標準");
+  if (!name) return;
+  await fetch("/api/templates", {
+    method: "POST", headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({
+      email, name,
+      subject: $("subject").value, body: $("body").value,
+      prefix: $("prefix").value, honorific,
+    }),
+  });
+  await loadTemplates();
+  alert(`テンプレート「${name}」を保存しました。`);
+}
+async function deleteTemplate() {
+  const email = $("sender").value.trim();
+  const name = $("templateSelect").value;
+  if (!email || !name) { alert("削除するテンプレートを選択してください。"); return; }
+  if (!confirm(`テンプレート「${name}」を削除しますか?`)) return;
+  await fetch("/api/templates", {
+    method: "DELETE", headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({email, name}),
+  });
+  await loadTemplates();
+}
+
+/* ---------- ファイル読み込み ---------- */
+async function uploadFiles() {
+  const csv = $("csvFile").files[0];
+  const pdf = $("pdfFile").files[0];
+  showMsg("uploadMsg", "", "");
+  const fd = new FormData();
+  if (csv) fd.append("csv", csv);
+  if (pdf) fd.append("pdf", pdf);
+  fd.append("pages_per", $("pagesPer").value);
+  $("uploadBtn").disabled = true;
+  try {
+    const res = await fetch("/api/upload", {method: "POST", body: fd});
+    const data = await res.json();
+    jobId = data.valid ? data.job_id : "";
+    students = data.students || [];
+    let html = "";
+    if (data.errors && data.errors.length)
+      html += `<div class="msg-error">${data.errors.map(esc).join("\n")}</div>`;
+    if (data.warnings && data.warnings.length)
+      html += `<div class="msg-warn">${data.warnings.map(esc).join("\n")}</div>`;
+    if (data.valid) {
+      const sendable = students.filter(s => !s.skip).length;
+      html += `<div class="msg-ok">読み込みOK: ${students.length}名(送信対象 ${sendable}名) / PDF ${data.total_pages}ページ / 1人あたり ${$("pagesPer").value}ページ</div>`;
+    }
+    $("uploadMsg").innerHTML = html;
+    $("previewArea").classList.toggle("hidden", students.length === 0);
+    renderPreviewTable();
+    updateGreetingPreview();
+  } catch (e) {
+    showMsg("uploadMsg", "error", "読み込みに失敗しました: " + e);
+  } finally {
+    $("uploadBtn").disabled = false;
+  }
+}
+function renderPreviewTable() {
+  const tbody = $("previewTable").querySelector("tbody");
+  tbody.innerHTML = "";
+  for (const s of students) {
+    const tr = document.createElement("tr");
+    if (s.skip) tr.className = "skip";
+    const pages = s.page_start
+      ? (s.page_start === s.page_end ? `${s.page_start}` : `${s.page_start}〜${s.page_end}`)
+      : "-";
+    tr.innerHTML = `
+      <td>${esc(s.serial)}</td><td>${esc(s.class)}</td><td>${esc(s.number)}</td>
+      <td>${esc(s.name)}${esc(s.name ? honorific : "")}</td>
+      <td>${esc(s.email)}</td><td>${esc(pages)}</td>
+      <td>${s.skip ? "-" : esc(attachName(s.name))}</td>
+      <td>${s.skip ? "⚠ スキップ(" + esc(s.skip_reason) + ")" : "送信対象"}</td>`;
+    tbody.appendChild(tr);
+  }
+}
+
+/* ---------- 送信 ---------- */
+function sendPayload(extra) {
+  return Object.assign({
+    job_id: jobId,
+    sender: $("sender").value.trim(),
+    password: $("password").value,
+    subject: $("subject").value,
+    body: $("body").value,
+    honorific, prefix: $("prefix").value,
+  }, extra || {});
+}
+function checkReady() {
+  if (!jobId) { alert("先に STEP 2 で「読み込んでチェック」を実行し、エラーを解消してください。"); return false; }
+  return true;
+}
+async function testSend() {
+  if (!checkReady()) return;
+  $("testBtn").disabled = true;
+  showMsg("sendMsg", "warn", "テスト送信中です…");
+  try {
+    const res = await fetch("/api/test_send", {
+      method: "POST", headers: {"Content-Type": "application/json"},
+      body: JSON.stringify(sendPayload()),
+    });
+    const data = await res.json();
+    showMsg("sendMsg", data.ok ? "ok" : "error", data.message);
+  } catch (e) {
+    showMsg("sendMsg", "error", "テスト送信に失敗しました: " + e);
+  } finally {
+    $("testBtn").disabled = false;
+  }
+}
+async function realSend(serials) {
+  if (!checkReady()) return;
+  const n = serials ? serials.length : students.filter(s => !s.skip).length;
+  const label = serials ? "再送信" : "本送信";
+  if (!confirm(`${n}名に${label}します。よろしいですか?\n(送信には ${n}〜${n * 2}秒ほどかかります)`)) return;
+  $("sendBtn").disabled = true; $("testBtn").disabled = true;
+  showMsg("sendMsg", "", "");
+  try {
+    const res = await fetch("/api/send", {
+      method: "POST", headers: {"Content-Type": "application/json"},
+      body: JSON.stringify(sendPayload(serials ? {serials} : null)),
+    });
+    const data = await res.json();
+    if (!data.ok) {
+      showMsg("sendMsg", "error", data.message);
+      $("sendBtn").disabled = false; $("testBtn").disabled = false;
+      return;
+    }
+    currentMode = label;
+    $("progressArea").classList.remove("hidden");
+    $("resendBtn").classList.add("hidden");
+    $("cancelBtn").classList.remove("hidden");
+    $("resultTable").querySelector("tbody").innerHTML = "";
+    pollTimer = setInterval(pollProgress, 1000);
+  } catch (e) {
+    showMsg("sendMsg", "error", "送信の開始に失敗しました: " + e);
+    $("sendBtn").disabled = false; $("testBtn").disabled = false;
+  }
+}
+async function pollProgress() {
+  try {
+    const res = await fetch("/api/progress");
+    const st = await res.json();
+    const pct = st.total ? Math.round(st.done / st.total * 100) : 0;
+    $("progressBar").style.width = pct + "%";
+    $("progressBar").textContent = pct + "%";
+    $("progressText").textContent =
+      `${st.done} / ${st.total} 件  ${st.message || ""}`;
+    renderResults(st.results || []);
+    lastResults = st.results || [];
+    if (!st.running) {
+      clearInterval(pollTimer); pollTimer = null;
+      $("cancelBtn").classList.add("hidden");
+      $("sendBtn").disabled = false; $("testBtn").disabled = false;
+      const fails = lastResults.filter(r => r.status === "失敗");
+      const oks = lastResults.filter(r => r.status === "成功");
+      if (fails.length) {
+        showMsg("sendMsg", "error",
+          `${currentMode}が終了しました: 成功 ${oks.length}件 / 失敗 ${fails.length}件。` +
+          `下の「失敗した人だけ再送信」で再送できます。`);
+        $("resendBtn").classList.remove("hidden");
+      } else {
+        showMsg("sendMsg", "ok", `${currentMode}が完了しました: 成功 ${oks.length}件 / 失敗 0件`);
+      }
+    }
+  } catch (e) { /* 一時的な通信エラーは次のポーリングで回復 */ }
+}
+function renderResults(results) {
+  const tbody = $("resultTable").querySelector("tbody");
+  tbody.innerHTML = "";
+  for (const r of results) {
+    const tr = document.createElement("tr");
+    if (r.status === "失敗") tr.className = "fail";
+    tr.innerHTML = `<td>${esc(r.serial)}</td><td>${esc(r.name)}</td>
+      <td>${esc(r.email)}</td><td>${r.status === "成功" ? "✅ 成功" : "❌ 失敗"}</td>
+      <td>${esc(r.error)}</td>`;
+    tbody.appendChild(tr);
+  }
+}
+async function cancelSend() {
+  if (!confirm("送信を中断しますか?(すでに送信された分は取り消せません)")) return;
+  await fetch("/api/cancel", {method: "POST"});
+}
+function resendFailed() {
+  const serials = lastResults.filter(r => r.status === "失敗").map(r => r.serial);
+  if (!serials.length) { alert("失敗した送信はありません。"); return; }
+  realSend(serials);
+}
+
+/* ---------- 履歴 ---------- */
+async function toggleHistory() {
+  const card = $("historyCard");
+  if (!card.classList.contains("hidden")) { card.classList.add("hidden"); return; }
+  const res = await fetch("/api/history");
+  const data = await res.json();
+  const tbody = $("historyTable").querySelector("tbody");
+  tbody.innerHTML = "";
+  data.history.forEach((h, i) => {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `<td>${esc(h.datetime)}</td><td>${esc(h.sender)}</td>
+      <td>${esc(h.mode)}</td><td>${esc(h.subject)}</td>
+      <td>${esc(h.ok)}</td><td>${esc(h.fail)}</td>
+      <td><button class="secondary" style="padding:4px 10px;font-size:12px"
+        onclick="showHistoryDetail(${i})">詳細</button></td>`;
+    tbody.appendChild(tr);
+  });
+  if (!data.history.length) tbody.innerHTML = "<tr><td colspan='7'>履歴はまだありません。</td></tr>";
+  window._history = data.history;
+  $("historyDetail").innerHTML = "";
+  card.classList.remove("hidden");
+}
+function showHistoryDetail(i) {
+  const h = window._history[i];
+  let rows = h.results.map(r =>
+    `<tr${r.status === "失敗" ? ' class="fail"' : ""}><td>${esc(r.serial)}</td><td>${esc(r.name)}</td>
+     <td>${esc(r.email)}</td><td>${esc(r.status)}</td><td>${esc(r.error)}</td></tr>`).join("");
+  $("historyDetail").innerHTML = `
+    <h3 style="font-size:14px;margin:14px 0 4px">${esc(h.datetime)} ${esc(h.mode)}「${esc(h.subject)}」の詳細</h3>
+    <div class="scrollbox"><table>
+      <thead><tr><th>通し番号</th><th>生徒氏名</th><th>メールアドレス</th><th>結果</th><th>エラー内容</th></tr></thead>
+      <tbody>${rows}</tbody></table></div>`;
+}
+
+updateGreetingPreview();
+</script>
+</body>
+</html>
